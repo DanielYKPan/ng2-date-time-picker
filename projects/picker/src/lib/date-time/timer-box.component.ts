@@ -6,6 +6,8 @@ import {
     ChangeDetectionStrategy,
     Component,
     EventEmitter,
+    ElementRef,
+    ViewChild,
     Input,
     OnDestroy,
     OnInit,
@@ -13,7 +15,7 @@ import {
 } from '@angular/core';
 import { coerceNumberProperty } from '@angular/cdk/coercion';
 import { Subject, Subscription } from 'rxjs';
-import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { debounceTime } from 'rxjs/operators';
 
 @Component({
     exportAs: 'owlDateTimeTimerBox',
@@ -71,22 +73,27 @@ export class OwlTimerBoxComponent implements OnInit, OnDestroy {
         return true;
     }
 
+    @ViewChild('valueInput', { static: true })
+    private valueInput: ElementRef;
+    private onValueInputMouseWheelBind = this.onValueInputMouseWheel.bind(this);
+
     constructor() {
     }
 
     public ngOnInit() {
         this.inputStreamSub = this.inputStream.pipe(
-            debounceTime(500),
-            distinctUntilChanged()
+            debounceTime(500)
         ).subscribe(( val: string ) => {
             if (val) {
                 const inputValue = coerceNumberProperty(val, 0);
                 this.updateValueViaInput(inputValue);
             }
-        })
+        });
+        this.bindValueInputMouseWheel();
     }
-
+        
     public ngOnDestroy(): void {
+        this.unbindValueInputMouseWheel();
         this.inputStreamSub.unsubscribe();
     }
 
@@ -98,8 +105,15 @@ export class OwlTimerBoxComponent implements OnInit, OnDestroy {
         this.updateValue(this.value - this.step);
     }
 
-    public handleInputChange( val: string ): void {
+    public handleInputChange(val: string ): void {
         this.inputStream.next(val);
+    }
+
+    public focusOut(value: string): void {
+        if (value) {
+            const inputValue = coerceNumberProperty(value, 0);
+            this.updateValueViaInput(inputValue);
+        }
     }
 
     private updateValue( value: number ): void {
@@ -111,5 +125,34 @@ export class OwlTimerBoxComponent implements OnInit, OnDestroy {
             return;
         }
         this.inputChange.emit(value);
+    }
+
+    private onValueInputMouseWheel( event: any ): void {
+        event = event || window.event;
+        const delta = event.wheelDelta || -event.deltaY || -event.detail;
+
+        if (delta > 0) {
+          if (!this.upBtnDisabled) {
+            this.upBtnClicked();
+          }
+        } else if (delta < 0) {
+          if (!this.downBtnDisabled) {
+            this.downBtnClicked();
+          }
+        }
+
+        event.preventDefault ? event.preventDefault() : (event.returnValue = false);
+    }
+
+    private bindValueInputMouseWheel(): void {
+        this.valueInput.nativeElement.addEventListener(
+            'onwheel' in document ? 'wheel' : 'mousewheel',
+            this.onValueInputMouseWheelBind);
+    }
+
+    private unbindValueInputMouseWheel(): void {
+        this.valueInput.nativeElement.removeEventListener(
+            'onwheel' in document ? 'wheel' : 'mousewheel',
+            this.onValueInputMouseWheelBind);
     }
 }
